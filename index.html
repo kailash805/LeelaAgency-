@@ -1,72 +1,6 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Secure 5 Item Entry + Refund System</title>
-
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-
-  <style>
-    body { font-family: Arial; margin:20px; }
-    input, select { padding:5px; margin:5px; }
-    table { border-collapse: collapse; margin-top:10px; }
-    th, td { padding:8px; border:1px solid #ccc; }
-    button { padding:5px 10px; margin:5px; cursor:pointer; }
-    .pending { background:#fff3cd; padding:10px; margin:5px; }
-    .confirmed { background:#d4edda; padding:10px; margin:5px; }
-    .refundBox { background:#f8d7da; padding:10px; margin:5px; }
-  </style>
-</head>
-
-<body>
-
-<h2>Login</h2>
-<input type="text" id="mobile" placeholder="Mobile Number">
-<input type="password" id="password" placeholder="Password">
-<button onclick="login()">Login</button>
-
-<div id="app" style="display:none;">
-
-<h3>Welcome: <span id="userRole"></span></h3>
-
-<h2>5 Fixed Items Entry (Only C)</h2>
-
-<table id="itemTable">
-<tr>
-  <th>Item</th>
-  <th>Price</th>
-  <th>Qty</th>
-</tr>
-</table>
-
-<button id="submitBtn" onclick="submitData()">Submit</button>
-
-<hr>
-<h3>Grand Total: ₹<span id="grandTotal">0</span></h3>
-
-<hr>
-<h2 id="refundTitle" style="display:none;">Refund Panel (Only C)</h2>
-
-<div id="refundSection" style="display:none;">
-  <select id="refundEntry"></select>
-  <select id="refundItem"></select>
-  <input type="number" id="refundQty" placeholder="Refund Qty">
-  <button onclick="submitRefund()">Submit Refund</button>
-</div>
-
-<hr>
-<h2>All Entries</h2>
-<div id="entries"></div>
-
-<hr>
-<h2>Refund History</h2>
-<div id="refundHistory"></div>
-
-</div>
-
 <script>
 
-// 🔥 Your Firebase Config (Already Added)
+// 🔥 Firebase Config
 var firebaseConfig = {
   apiKey: "AIzaSyDeWeYu7mOaPcrDnqnTFZudck8tRU1az-M",
   authDomain: "myapp-a3d28.firebaseapp.com",
@@ -80,20 +14,20 @@ var firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 var database = firebase.database();
 
-// 🔐 Fixed Users
+// 🔐 Users
 var users = {
   "9111111111": { role: "A", password: "1234" },
   "9222222222": { role: "B", password: "1234" },
   "9988770000": { role: "C", password: "1234" }
 };
 
-// 💰 Prices
+// 💰 Prices updated
 var prices = {
-  "200 G":20,
-  "600 G":52,
-  "Pizza":40,
-  "Bhajipav":45,
-  "Braun 400 G":50
+  "200 G": 20,
+  "600 G": 51,
+  "Pizza": 35,
+  "Bhajipav": 45,
+  "Braun 400 G": 50
 };
 
 let currentUser = "";
@@ -112,14 +46,11 @@ for(let item in prices){
 
 // 🔐 LOGIN
 function login(){
-
   let mobile = document.getElementById("mobile").value.trim();
   let password = document.getElementById("password").value.trim();
 
   if(users[mobile] && users[mobile].password === password){
-
     currentUser = users[mobile].role;
-
     document.getElementById("app").style.display = "block";
     document.getElementById("userRole").innerText = currentUser;
 
@@ -131,7 +62,6 @@ function login(){
       document.getElementById("refundSection").style.display = "block";
       document.getElementById("refundTitle").style.display = "block";
 
-      // Refund item dropdown
       let refundItem = document.getElementById("refundItem");
       refundItem.innerHTML = "";
       for(let item in prices){
@@ -140,7 +70,7 @@ function login(){
     }
 
     alert("Login Successful");
-
+    renderEntries(); // show entries on login
   } else {
     alert("Invalid Mobile or Password");
   }
@@ -148,7 +78,6 @@ function login(){
 
 // 📝 SUBMIT ENTRY
 function submitData(){
-
   if(currentUser !== "C"){
     alert("Only C can submit");
     return;
@@ -181,66 +110,122 @@ function submitData(){
   }
 }
 
-function loadEntries(){
+// 📊 REALTIME LISTENER
+database.ref("entries").on("value", function(snapshot){
+  renderEntries(snapshot);
+  renderRefundHistory(snapshot);
+});
 
-  database.ref("entries").once("value", function(snapshot){
+// 🎯 RENDER ENTRIES
+function renderEntries(snapshot){
+  if(!currentUser) return;
 
-    let data = snapshot.val() || {};
-    let html = "";
-    let totalConfirmed = 0;
+  if(!snapshot){
+    database.ref("entries").once("value").then(renderEntries);
+    return;
+  }
 
-    let refundEntryDropdown = document.getElementById("refundEntry");
-    if(refundEntryDropdown) refundEntryDropdown.innerHTML = "";
+  let data = snapshot.val() || {};
+  let html = "";
+  let totalConfirmed = 0;
 
-    for(let id in data){
+  let refundEntryDropdown = document.getElementById("refundEntry");
+  if(refundEntryDropdown) refundEntryDropdown.innerHTML = "";
 
-      let entry = data[id];
-      let entryDate = new Date(entry.timestamp);
+  for(let id in data){
+    let entry = data[id];
+    let entryDate = new Date(entry.timestamp);
 
-      html += `<div class="${entry.status}">
-        <b>Date:</b> ${entryDate.toLocaleString()}<br>`;
+    html += `<div class="${entry.status}" style="border:1px solid #ccc; margin:5px; padding:5px;">
+      <b>Date:</b> ${entryDate.toLocaleString()}<br>`;
 
-      if(entry.items){
-        for(let item in entry.items){
-          if(entry.items[item] > 0){
-            html += `${item} : ${entry.items[item]}<br>`;
-          }
-        }
+    // Show items
+    for(let item in entry.items){
+      if(entry.items[item] > 0){
+        html += `${item} : ${entry.items[item]} × ₹${prices[item]} = ₹${entry.items[item]*prices[item]}<br>`;
       }
-
-      html += `<b>Total:</b> ₹${entry.total}<br>
-               <b>Status:</b> ${entry.status}`;
-
-      if(entry.status === "confirmed"){
-        totalConfirmed += entry.total;
-
-        if(currentUser === "C"){
-          refundEntryDropdown.innerHTML += 
-            `<option value="${id}">
-              ${entryDate.toLocaleDateString()} - ₹${entry.total}
-            </option>`;
-        }
-      }
-
-      if((currentUser === "A" || currentUser === "B") 
-          && entry.status === "pending"){
-        html += `<br><button onclick="confirmEntry('${id}')">
-                  Confirm
-                 </button>`;
-      }
-
-      if(currentUser === "C" && entry.status === "pending"){
-        html += `<button onclick="deleteEntry('${id}')">
-                  Delete
-                 </button>`;
-      }
-
-      html += `</div>`;
     }
 
-    document.getElementById("entries").innerHTML = html;
-    document.getElementById("grandTotal").innerText = totalConfirmed;
+    html += `<b>Total:</b> ₹${entry.total}<br>
+             <b>Status:</b> ${entry.status}<br>`;
 
+    if(entry.status === "confirmed"){
+      totalConfirmed += entry.total;
+    }
+
+    if((currentUser === "A" || currentUser === "B") 
+        && entry.status === "pending"){
+      html += `<button onclick="confirmEntry('${id}')">Confirm</button>`;
+    }
+
+    if(currentUser === "C" && entry.status === "pending"){
+      html += `<button onclick="deleteEntry('${id}')">Delete</button>`;
+    }
+
+    html += `</div>`;
+  }
+
+  document.getElementById("entries").innerHTML = html;
+  document.getElementById("grandTotal").innerText = totalConfirmed;
+}
+
+// ✅ CONFIRM
+function confirmEntry(id){
+  database.ref("entries/" + id).update({
+    status: "confirmed",
+    confirmedBy: currentUser
+  });
+}
+
+// ❌ DELETE
+function deleteEntry(id){
+  database.ref("entries/" + id).remove();
+}
+
+// 💰 REFUND SYSTEM
+function submitRefund(){
+
+  let entryId = document.getElementById("refundEntry").value;
+  let item = document.getElementById("refundItem").value;
+  let qty = parseInt(document.getElementById("refundQty").value);
+
+  if(!entryId || !item || !qty){
+    alert("Fill all refund details");
+    return;
+  }
+
+  let amount = qty * prices[item];
+
+  database.ref("refunds").push({
+    entryId: entryId,
+    item: item,
+    qty: qty,
+    amount: amount,
+    timestamp: Date.now()
   });
 
+  alert("Refund Saved");
+  document.getElementById("refundQty").value = "";
 }
+
+// 📄 REFUND HISTORY
+function renderRefundHistory(snapshot){
+  let data = snapshot.val() || {};
+  let html = "";
+
+  database.ref("refunds").once("value").then(function(refundSnap){
+    let refunds = refundSnap.val() || {};
+    for(let id in refunds){
+      let r = refunds[id];
+      let entryDate = new Date(r.timestamp);
+      html += `<div style="border:1px solid #f00; padding:5px; margin:5px; background:#f8d7da;">
+        <b>Refund Date:</b> ${entryDate.toLocaleString()}<br>
+        <b>Entry ID:</b> ${r.entryId}<br>
+        <b>Item:</b> ${r.item} | <b>Qty:</b> ${r.qty} | <b>Amount:</b> ₹${r.amount}
+      </div>`;
+    }
+    document.getElementById("refundHistory").innerHTML = html;
+  });
+}
+
+     </script>
