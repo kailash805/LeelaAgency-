@@ -19,7 +19,6 @@
 </head>
 <body>
 
-<!-- LOGIN SECTION -->
 <div id="loginSection">
   <h2>Login</h2>
   <input type="text" id="mobile" placeholder="Mobile Number">
@@ -27,7 +26,6 @@
   <button onclick="login()">Login</button>
 </div>
 
-<!-- APP SECTION -->
 <div id="app" style="display:none;">
 
   <h3>Welcome: <span id="userRole"></span></h3>
@@ -212,14 +210,17 @@ function loadEntries(){
       html += `<b>Total:</b> ₹${entry.total}<br>
                <b>Status:</b> ${entry.status}`;
 
+      // CONFIRM BUTTON A/B
       if((currentUser === "A" || currentUser === "B") && entry.status === "pending"){
         html += `<br><button onclick="confirmEntry('${id}')">Confirm</button>`;
       }
 
+      // DELETE BUTTON C
       if(currentUser === "C" && entry.status === "pending"){
-        html += `<button onclick="deleteEntry('${id}')">Delete</button>`;
+        html += `<button onclick="deleteEntry('${id}')">Delete Entry</button>`;
       }
 
+      // REFUND DROPDOWN C
       if(entry.status === "confirmed" && currentUser === "C"){
         refundEntryDropdown.innerHTML += 
           `<option value="${id}">${entryDate.toLocaleDateString()} - ₹${entry.total}</option>`;
@@ -249,6 +250,8 @@ function deleteEntry(id){
 
 // REFUND
 function submitRefund(){
+  if(currentUser !== "C"){ alert("Only C can refund"); return; }
+
   let entryId = document.getElementById("refundEntry").value;
   let item = document.getElementById("refundItem").value;
   let qty = parseInt(document.getElementById("refundQty").value);
@@ -281,7 +284,7 @@ function loadRefundHistory(){
     for(let id in data){
       let refund = data[id];
       let refundDate = new Date(refund.timestamp);
-      let entryDate = ""; 
+      let entryDate = "";
 
       if(refund.entryId){
         database.ref("entries/" + refund.entryId).once("value").then(function(entrySnap){
@@ -296,11 +299,16 @@ function loadRefundHistory(){
             <b>Refunded By:</b> C<br>
             <b>Item:</b> ${refund.item}<br>
             <b>Qty:</b> ${refund.qty}<br>
-            <b>Amount:</b> ₹${refund.amount}<br>
-          </div>`;
+            <b>Amount:</b> ₹${refund.amount}<br>`;
 
+          // DELETE REFUND BUTTON C
+          if(currentUser === "C"){
+            html += `<button onclick="deleteRefund('${id}')">Delete Refund</button>`;
+          }
+
+          html += `</div>`;
           document.getElementById("refundHistory").innerHTML += html;
-          html = ""; 
+          html = "";
         });
       }
     }
@@ -309,6 +317,11 @@ function loadRefundHistory(){
       document.getElementById("refundHistory").innerHTML = "No refund yet.";
     }
   });
+}
+
+// DELETE REFUND C
+function deleteRefund(id){
+  database.ref("refunds/" + id).remove();
 }
 </script>
 </body>
