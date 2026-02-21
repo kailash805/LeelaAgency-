@@ -29,17 +29,20 @@
 <div id="app" style="display:none;">
 
   <h3>Welcome: <span id="userRole"></span></h3>
-  <button onclick="logout()" style="margin-bottom:15px;">Logout</button>
+  <button onclick="logout()">Logout</button>
 
-  <h2>5 Fixed Items Entry (Only C)</h2>
-  <table id="itemTable">
-    <tr>
-      <th>Item</th>
-      <th>Price</th>
-      <th>Qty</th>
-    </tr>
-  </table>
-  <button id="submitBtn" onclick="submitData()">Submit</button>
+  <!-- ✅ ENTRY SECTION WRAPPED -->
+  <div id="entrySection">
+    <h2>5 Fixed Items Entry (Only C)</h2>
+    <table id="itemTable">
+      <tr>
+        <th>Item</th>
+        <th>Price</th>
+        <th>Qty</th>
+      </tr>
+    </table>
+    <button id="submitBtn" onclick="submitData()">Submit</button>
+  </div>
 
   <hr>
   <h3>Grand Total: ₹<span id="grandTotal">0</span></h3>
@@ -64,7 +67,7 @@
 </div>
 
 <script>
-// Firebase Config
+// Firebase Config (same as yours)
 var firebaseConfig = {
   apiKey: "AIzaSyDeWeYu7mOaPcrDnqnTFZudck8tRU1az-M",
   authDomain: "myapp-a3d28.firebaseapp.com",
@@ -95,7 +98,7 @@ var prices = {
 
 let currentUser = "";
 
-// Generate Item Table
+// Generate Table
 let table = document.getElementById("itemTable");
 for(let item in prices){
   table.innerHTML += `
@@ -107,7 +110,7 @@ for(let item in prices){
   `;
 }
 
-// LOGIN FUNCTION
+// LOGIN
 function login(){
   let mobile = document.getElementById("mobile").value.trim();
   let password = document.getElementById("password").value.trim();
@@ -119,7 +122,11 @@ function login(){
     document.getElementById("app").style.display = "block";
     document.getElementById("userRole").innerText = currentUser;
 
-    if(currentUser !== "C") document.getElementById("submitBtn").style.display = "none";
+    // ✅ Hide entry section for A/B
+    if(currentUser !== "C"){
+      document.getElementById("entrySection").style.display = "none";
+    }
+
     if(currentUser === "C"){
       document.getElementById("refundSection").style.display = "block";
       document.getElementById("refundTitle").style.display = "block";
@@ -131,7 +138,6 @@ function login(){
       }
     }
 
-    alert("Login Successful");
     loadEntries();
     loadRefundHistory();
 
@@ -140,21 +146,12 @@ function login(){
   }
 }
 
-// LOGOUT FUNCTION
-function logout(){
-  currentUser = "";
-  document.getElementById("app").style.display = "none";
-  document.getElementById("loginSection").style.display = "block";
-  document.getElementById("mobile").value = "";
-  document.getElementById("password").value = "";
-}
+// LOGOUT
+function logout(){ location.reload(); }
 
-// C SUBMIT ENTRY
+// SUBMIT ENTRY
 function submitData(){
-  if(currentUser !== "C"){
-    alert("Only C can submit");
-    return;
-  }
+  if(currentUser !== "C") return;
 
   let entryData = {};
   let total = 0;
@@ -165,22 +162,14 @@ function submitData(){
     total += qty * prices[item];
   }
 
-  if(total === 0){
-    alert("Enter quantity first");
-    return;
-  }
+  if(total === 0){ alert("Enter quantity"); return; }
 
   database.ref("entries").push({
     items: entryData,
     total: total,
     timestamp: Date.now(),
-    status: "pending",
-    confirmedBy: ""
+    status: "pending"
   });
-
-  for(let item in prices){
-    document.getElementById(item).value = "";
-  }
 }
 
 // LOAD ENTRIES
@@ -189,42 +178,36 @@ function loadEntries(){
     let data = snapshot.val() || {};
     let html = "";
     let totalConfirmed = 0;
-    let refundEntryDropdown = document.getElementById("refundEntry");
-    if(refundEntryDropdown) refundEntryDropdown.innerHTML = "";
+    let refundDropdown = document.getElementById("refundEntry");
+    refundDropdown.innerHTML = "";
 
     for(let id in data){
       let entry = data[id];
-      let entryDate = new Date(entry.timestamp);
+      let date = new Date(entry.timestamp);
 
       html += `<div class="${entry.status}">
-        <b>Date:</b> ${entryDate.toLocaleString()}<br>`;
+      <b>Date:</b> ${date.toLocaleString()}<br>`;
 
-      if(entry.items){
-        for(let item in entry.items){
-          if(entry.items[item] > 0){
-            html += `${item} : ${entry.items[item]} <br>`;
-          }
+      for(let item in entry.items){
+        if(entry.items[item] > 0){
+          html += `${item}: ${entry.items[item]}<br>`;
         }
       }
 
       html += `<b>Total:</b> ₹${entry.total}<br>
                <b>Status:</b> ${entry.status}`;
 
-      // CONFIRM BUTTON A/B
       if((currentUser === "A" || currentUser === "B") && entry.status === "pending"){
         html += `<br><button onclick="confirmEntry('${id}')">Confirm</button>`;
       }
 
-      // DELETE BUTTON C
-      if(currentUser === "C" && entry.status === "pending"){
-        html += `<button onclick="deleteEntry('${id}')">Delete Entry</button>`;
-      }
-
-      // REFUND DROPDOWN C
-      if(entry.status === "confirmed" && currentUser === "C"){
-        refundEntryDropdown.innerHTML += 
-          `<option value="${id}">${entryDate.toLocaleDateString()} - ₹${entry.total}</option>`;
+      if(entry.status === "confirmed"){
         totalConfirmed += entry.total;
+
+        if(currentUser === "C"){
+          refundDropdown.innerHTML += 
+            `<option value="${id}">${date.toLocaleDateString()} - ₹${entry.total}</option>`;
+        }
       }
 
       html += `</div>`;
@@ -235,22 +218,13 @@ function loadEntries(){
   });
 }
 
-// CONFIRM ENTRY
+// CONFIRM
 function confirmEntry(id){
-  database.ref("entries/" + id).update({
-    status: "confirmed",
-    confirmedBy: currentUser
-  });
+  database.ref("entries/" + id).update({ status:"confirmed" });
 }
 
-// DELETE ENTRY
-function deleteEntry(id){
-  database.ref("entries/" + id).remove();
-}
-
-// REFUND
+// ✅ REFUND WITH DUPLICATE CHECK
 function submitRefund(){
-  if(currentUser !== "C"){ alert("Only C can refund"); return; }
 
   let entryId = document.getElementById("refundEntry").value;
   let item = document.getElementById("refundItem").value;
@@ -261,18 +235,35 @@ function submitRefund(){
     return;
   }
 
-  let amount = qty * prices[item];
+  // Check duplicate refund
+  database.ref("refunds")
+  .orderByChild("entryId")
+  .equalTo(entryId)
+  .once("value", function(snapshot){
 
-  database.ref("refunds").push({
-    entryId: entryId,
-    item: item,
-    qty: qty,
-    amount: amount,
-    timestamp: Date.now()
+    let data = snapshot.val();
+
+    if(data){
+      for(let id in data){
+        if(data[id].item === item){
+          alert("Duplicate refund not allowed for same item.");
+          return;
+        }
+      }
+    }
+
+    let amount = qty * prices[item];
+
+    database.ref("refunds").push({
+      entryId: entryId,
+      item: item,
+      qty: qty,
+      amount: amount,
+      timestamp: Date.now()
+    });
+
+    alert("Refund Saved");
   });
-
-  alert("Refund Saved");
-  loadRefundHistory();
 }
 
 // LOAD REFUND HISTORY
@@ -283,45 +274,19 @@ function loadRefundHistory(){
 
     for(let id in data){
       let refund = data[id];
-      let refundDate = new Date(refund.timestamp);
-      let entryDate = "";
+      let date = new Date(refund.timestamp);
 
-      if(refund.entryId){
-        database.ref("entries/" + refund.entryId).once("value").then(function(entrySnap){
-          let entryData = entrySnap.val();
-          if(entryData && entryData.timestamp){
-            entryDate = new Date(entryData.timestamp).toLocaleString();
-          }
-
-          html += `<div class="refundBox">
-            <b>Entry Date:</b> ${entryDate}<br>
-            <b>Refund Date:</b> ${refundDate.toLocaleString()}<br>
-            <b>Refunded By:</b> C<br>
-            <b>Item:</b> ${refund.item}<br>
-            <b>Qty:</b> ${refund.qty}<br>
-            <b>Amount:</b> ₹${refund.amount}<br>`;
-
-          // DELETE REFUND BUTTON C
-          if(currentUser === "C"){
-            html += `<button onclick="deleteRefund('${id}')">Delete Refund</button>`;
-          }
-
-          html += `</div>`;
-          document.getElementById("refundHistory").innerHTML += html;
-          html = "";
-        });
-      }
+      html += `<div class="refundBox">
+        <b>Refund Date:</b> ${date.toLocaleString()}<br>
+        <b>Item:</b> ${refund.item}<br>
+        <b>Qty:</b> ${refund.qty}<br>
+        <b>Amount:</b> ₹${refund.amount}
+      </div>`;
     }
 
-    if(Object.keys(data).length === 0){
-      document.getElementById("refundHistory").innerHTML = "No refund yet.";
-    }
+    document.getElementById("refundHistory").innerHTML = 
+      html || "No refund yet.";
   });
-}
-
-// DELETE REFUND C
-function deleteRefund(id){
-  database.ref("refunds/" + id).remove();
 }
 </script>
 </body>
