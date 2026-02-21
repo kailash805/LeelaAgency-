@@ -17,6 +17,7 @@
     .refundBox { background:#f8d7da; padding:10px; margin:5px; }
   </style>
 </head>
+
 <body>
 
 <h2>Login</h2>
@@ -41,7 +42,7 @@
 <button id="submitBtn" onclick="submitData()">Submit</button>
 
 <hr>
-<h3>Grand Total (Confirmed - Refund): ₹<span id="grandTotal">0</span></h3>
+<h3>Grand Total: ₹<span id="grandTotal">0</span></h3>
 <h3>Weekly Total: ₹<span id="weeklyTotal">0</span></h3>
 
 <hr>
@@ -68,25 +69,23 @@
 
 // 🔥 Firebase Config
 var firebaseConfig = {
-  apiKey: "AIzaSyDeWeYu7mOaPcrDnqnTFZudck8tRU1az-M",
-  authDomain: "myapp-a3d28.firebaseapp.com",
-  databaseURL: "https://myapp-a3d28-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "myapp-a3d28",
-  storageBucket: "myapp-a3d28.firebasestorage.app",
-  messagingSenderId: "528024303624",
-  appId: "1:528024303624:web:0c5e552d636fd2c93e39bd"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  databaseURL: "YOUR_DATABASE_URL",
+  projectId: "YOUR_PROJECT_ID"
 };
 
 firebase.initializeApp(firebaseConfig);
 var database = firebase.database();
 
-// 🔐 Fixed Users
+// 🔐 Users
 var users = {
   "9111111111": { role: "A", password: "1234" },
   "9222222222": { role: "B", password: "1234" },
   "9988770000": { role: "C", password: "1234" }
 };
 
+// 💰 Prices
 var prices = {
   "200 G":20,
   "600 G":52,
@@ -97,7 +96,7 @@ var prices = {
 
 let currentUser = "";
 
-// Generate Item Table
+// Generate Table
 let table = document.getElementById("itemTable");
 for(let item in prices){
   table.innerHTML += `
@@ -109,12 +108,13 @@ for(let item in prices){
   `;
 }
 
-// 🔐 LOGIN
+// LOGIN
 function login(){
   let mobile = document.getElementById("mobile").value;
   let password = document.getElementById("password").value;
 
   if(users[mobile] && users[mobile].password === password){
+
     currentUser = users[mobile].role;
     document.getElementById("app").style.display = "block";
     document.getElementById("userRole").innerText = currentUser;
@@ -126,6 +126,13 @@ function login(){
     if(currentUser === "C"){
       document.getElementById("refundSection").style.display = "block";
       document.getElementById("refundTitle").style.display = "block";
+
+      // Refund Item Dropdown
+      let refundItem = document.getElementById("refundItem");
+      refundItem.innerHTML = "";
+      for(let item in prices){
+        refundItem.innerHTML += `<option value="${item}">${item}</option>`;
+      }
     }
 
   } else {
@@ -133,7 +140,7 @@ function login(){
   }
 }
 
-// 📝 SUBMIT ENTRY (C ONLY)
+// SUBMIT ENTRY
 function submitData(){
 
   if(currentUser !== "C"){
@@ -150,7 +157,7 @@ function submitData(){
     total += qty * prices[item];
   }
 
-  if(total == 0){
+  if(total === 0){
     alert("Enter quantity first");
     return;
   }
@@ -158,7 +165,6 @@ function submitData(){
   database.ref("entries").push({
     items: entryData,
     total: total,
-    createdBy: "C",
     timestamp: Date.now(),
     status: "pending",
     confirmedBy: ""
@@ -169,18 +175,12 @@ function submitData(){
   }
 }
 
-// 📊 ENTRY LIST + TOTAL CALCULATION
+// ENTRY LIST
 database.ref("entries").on("value", function(snapshot){
 
-  let data = snapshot.val();
+  let data = snapshot.val() || {};
   let html = "";
-  let grandTotal = 0;
-  let weeklyTotal = 0;
-
-  let now = new Date();
-  let firstDayOfWeek = new Date();
-  firstDayOfWeek.setDate(now.getDate() - now.getDay());
-  firstDayOfWeek.setHours(0,0,0,0);
+  let totalConfirmed = 0;
 
   let refundEntryDropdown = document.getElementById("refundEntry");
   if(refundEntryDropdown) refundEntryDropdown.innerHTML = "";
@@ -189,27 +189,14 @@ database.ref("entries").on("value", function(snapshot){
 
     let entry = data[id];
     let entryDate = new Date(entry.timestamp);
-    let className = entry.status === "pending" ? "pending" : "confirmed";
 
-    html += `<div class="${className}">
-      <b>Date:</b> ${entryDate.toLocaleDateString()} ${entryDate.toLocaleTimeString()}<br>`;
-
-    for(let item in entry.items){
-      if(entry.items[item] > 0){
-        html += `${item}: ${entry.items[item]}<br>`;
-      }
-    }
-
-    html += `<b>Total:</b> ₹${entry.total}<br>
-             <b>Status:</b> ${entry.status}`;
+    html += `<div class="${entry.status}">
+      <b>Date:</b> ${entryDate.toLocaleString()}<br>
+      <b>Total:</b> ₹${entry.total}<br>
+      <b>Status:</b> ${entry.status}`;
 
     if(entry.status === "confirmed"){
-      html += ` by ${entry.confirmedBy}`;
-      grandTotal += entry.total;
-
-      if(entryDate >= firstDayOfWeek){
-        weeklyTotal += entry.total;
-      }
+      totalConfirmed += entry.total;
 
       if(currentUser === "C"){
         refundEntryDropdown.innerHTML += 
@@ -217,8 +204,7 @@ database.ref("entries").on("value", function(snapshot){
       }
     }
 
-    if((currentUser === "A" || currentUser === "B") 
-        && entry.status === "pending"){
+    if((currentUser === "A" || currentUser === "B") && entry.status === "pending"){
       html += `<br><button onclick="confirmEntry('${id}')">Confirm</button>`;
     }
 
@@ -229,105 +215,9 @@ database.ref("entries").on("value", function(snapshot){
     html += `</div>`;
   }
 
-  calculateFinalTotal(grandTotal, weeklyTotal);
   document.getElementById("entries").innerHTML = html;
-
+  document.getElementById("grandTotal").innerText = totalConfirmed;
 });
-
-// 💰 REFUND SUBMIT
-function submitRefund(){
-
-  let entryId = document.getElementById("refundEntry").value;
-  let item = document.getElementById("refundItem").value;
-  let qty = parseInt(document.getElementById("refundQty").value);
-
-  if(!entryId || !item || !qty){
-    alert("Fill all refund details");
-    return;
-  }
-
-  let refundAmount = qty * prices[item];
-
-  database.ref("refunds").push({
-    entryId: entryId,
-    item: item,
-    qty: qty,
-    amount: refundAmount,
-    refundedBy: "C",
-    timestamp: Date.now()
-  });
-
-  alert("Refund Saved");
-}
-
-// 🔁 REFUND HISTORY + TOTAL ADJUST
-database.ref("refunds").on("value", function(snapshot){
-
-  let refunds = snapshot.val();
-  let html = "";
-  let refundTotal = 0;
-  let weeklyRefund = 0;
-
-  let now = new Date();
-  let firstDayOfWeek = new Date();
-  firstDayOfWeek.setDate(now.getDate() - now.getDay());
-  firstDayOfWeek.setHours(0,0,0,0);
-
-  for(let id in refunds){
-
-    let r = refunds[id];
-    let rDate = new Date(r.timestamp);
-
-    refundTotal += r.amount;
-
-    if(rDate >= firstDayOfWeek){
-      weeklyRefund += r.amount;
-    }
-
-    html += `
-      <div class="refundBox">
-        <b>Date:</b> ${rDate.toLocaleDateString()} ${rDate.toLocaleTimeString()}<br>
-        <b>Item:</b> ${r.item}<br>
-        <b>Qty:</b> ${r.qty}<br>
-        <b>Amount:</b> ₹${r.amount}
-      </div>
-    `;
-  }
-
-  document.getElementById("refundHistory").innerHTML = html;
-
-});
-
-// 🔢 FINAL TOTAL CALCULATION
-function calculateFinalTotal(entryTotal, weeklyEntryTotal){
-
-  database.ref("refunds").once("value", function(refSnap){
-
-    let refunds = refSnap.val() || {};
-    let refundTotal = 0;
-    let weeklyRefund = 0;
-
-    let now = new Date();
-    let firstDayOfWeek = new Date();
-    firstDayOfWeek.setDate(now.getDate() - now.getDay());
-    firstDayOfWeek.setHours(0,0,0,0);
-
-    for(let id in refunds){
-      let r = refunds[id];
-      let rDate = new Date(r.timestamp);
-
-      refundTotal += r.amount;
-
-      if(rDate >= firstDayOfWeek){
-        weeklyRefund += r.amount;
-      }
-    }
-
-    document.getElementById("grandTotal").innerText = entryTotal - refundTotal;
-    document.getElementById("weeklyTotal").innerText = weeklyEntryTotal - weeklyRefund;
-
-  });
-}
 
 // CONFIRM
 function confirmEntry(id){
@@ -342,7 +232,32 @@ function deleteEntry(id){
   database.ref("entries/" + id).remove();
 }
 
+// REFUND
+function submitRefund(){
+
+  let entryId = document.getElementById("refundEntry").value;
+  let item = document.getElementById("refundItem").value;
+  let qty = parseInt(document.getElementById("refundQty").value);
+
+  if(!entryId || !item || !qty){
+    alert("Fill all refund details");
+    return;
+  }
+
+  let amount = qty * prices[item];
+
+  database.ref("refunds").push({
+    entryId: entryId,
+    item: item,
+    qty: qty,
+    amount: amount,
+    timestamp: Date.now()
+  });
+
+  alert("Refund Saved");
+}
+
 </script>
 
 </body>
-  </html>
+</html>
