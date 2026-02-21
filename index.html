@@ -17,7 +17,6 @@
     .refundBox { background:#f8d7da; padding:10px; margin:5px; }
   </style>
 </head>
-
 <body>
 
 <h2>Login</h2>
@@ -198,12 +197,6 @@ database.ref("entries").on("value", function(snapshot){
     html += `<b>Total:</b> ₹${entry.total}<br>
              <b>Status:</b> ${entry.status}`;
 
-    // ✅ REFUND DROPDOWN
-    if(entry.status === "confirmed" && currentUser === "C"){
-      refundEntryDropdown.innerHTML += 
-        `<option value="${id}">${entryDate.toLocaleDateString()} - ₹${entry.total}</option>`;
-    }
-
     // ✅ CONFIRM BUTTON FOR A/B
     if((currentUser === "A" || currentUser === "B") && entry.status === "pending"){
       html += `<br><button onclick="confirmEntry('${id}')">Confirm</button>`;
@@ -212,6 +205,12 @@ database.ref("entries").on("value", function(snapshot){
     // ✅ DELETE BUTTON FOR C
     if(currentUser === "C" && entry.status === "pending"){
       html += `<button onclick="deleteEntry('${id}')">Delete</button>`;
+    }
+
+    // ✅ REFUND DROPDOWN
+    if(entry.status === "confirmed" && currentUser === "C"){
+      refundEntryDropdown.innerHTML += 
+        `<option value="${id}">${entryDate.toLocaleDateString()} - ₹${entry.total}</option>`;
     }
 
     html += `</div>`;
