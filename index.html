@@ -69,15 +69,18 @@
 // 🔥 Firebase Config
 var firebaseConfig = {
   apiKey: "AIzaSyDeWeYu7mOaPcrDnqnTFZudck8tRU1az-M",
-    authDomain: "myapp-a3d28.firebaseapp.com",
-    projectId: "myapp-a3d28",
-    storageBucket: "myapp-a3d28.firebasestorage.app",
-    messagingSenderId: "528024303624",
-    appId: "1:528024303624:web:0c5e552d636fd2c93e39bd"
-  };
+  authDomain: "myapp-a3d28.firebaseapp.com",
+  databaseURL: "https://myapp-a3d28-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "myapp-a3d28",
+  storageBucket: "myapp-a3d28.firebasestorage.app",
+  messagingSenderId: "528024303624",
+  appId: "1:528024303624:web:0c5e552d636fd2c93e39bd"
+};
 
 firebase.initializeApp(firebaseConfig);
 var database = firebase.database();
+
+</script>
 
 // 🔐 Fixed Users
 var users = {
