@@ -181,89 +181,66 @@ function submitData(){
   }
 }
 
-// 📊 LOAD ENTRIES
-database.ref("entries").on("value", function(snapshot){
+function loadEntries(){
 
-  let data = snapshot.val() || {};
-  let html = "";
-  let totalConfirmed = 0;
+  database.ref("entries").once("value", function(snapshot){
 
-  let refundEntryDropdown = document.getElementById("refundEntry");
-  if(refundEntryDropdown) refundEntryDropdown.innerHTML = "";
+    let data = snapshot.val() || {};
+    let html = "";
+    let totalConfirmed = 0;
 
-  for(let id in data){
+    let refundEntryDropdown = document.getElementById("refundEntry");
+    if(refundEntryDropdown) refundEntryDropdown.innerHTML = "";
 
-    let entry = data[id];
-    let entryDate = new Date(entry.timestamp);
+    for(let id in data){
 
-    html += `<div class="${entry.status}">
-      <b>Date:</b> ${entryDate.toLocaleString()}<br>
-      <b>Total:</b> ₹${entry.total}<br>
-      <b>Status:</b> ${entry.status}`;
+      let entry = data[id];
+      let entryDate = new Date(entry.timestamp);
 
-    if(entry.status === "confirmed"){
-      totalConfirmed += entry.total;
+      html += `<div class="${entry.status}">
+        <b>Date:</b> ${entryDate.toLocaleString()}<br>`;
 
-      if(currentUser === "C"){
-        refundEntryDropdown.innerHTML += 
-          `<option value="${id}">${entryDate.toLocaleDateString()} - ₹${entry.total}</option>`;
+      if(entry.items){
+        for(let item in entry.items){
+          if(entry.items[item] > 0){
+            html += `${item} : ${entry.items[item]}<br>`;
+          }
+        }
       }
+
+      html += `<b>Total:</b> ₹${entry.total}<br>
+               <b>Status:</b> ${entry.status}`;
+
+      if(entry.status === "confirmed"){
+        totalConfirmed += entry.total;
+
+        if(currentUser === "C"){
+          refundEntryDropdown.innerHTML += 
+            `<option value="${id}">
+              ${entryDate.toLocaleDateString()} - ₹${entry.total}
+            </option>`;
+        }
+      }
+
+      if((currentUser === "A" || currentUser === "B") 
+          && entry.status === "pending"){
+        html += `<br><button onclick="confirmEntry('${id}')">
+                  Confirm
+                 </button>`;
+      }
+
+      if(currentUser === "C" && entry.status === "pending"){
+        html += `<button onclick="deleteEntry('${id}')">
+                  Delete
+                 </button>`;
+      }
+
+      html += `</div>`;
     }
 
-    if((currentUser === "A" || currentUser === "B") && entry.status === "pending"){
-      html += `<br><button onclick="confirmEntry('${id}')">Confirm</button>`;
-    }
+    document.getElementById("entries").innerHTML = html;
+    document.getElementById("grandTotal").innerText = totalConfirmed;
 
-    if(currentUser === "C" && entry.status === "pending"){
-      html += `<button onclick="deleteEntry('${id}')">Delete</button>`;
-    }
-
-    html += `</div>`;
-  }
-
-  document.getElementById("entries").innerHTML = html;
-  document.getElementById("grandTotal").innerText = totalConfirmed;
-});
-
-// ✅ CONFIRM
-function confirmEntry(id){
-  database.ref("entries/" + id).update({
-    status: "confirmed",
-    confirmedBy: currentUser
-  });
-}
-
-// ❌ DELETE
-function deleteEntry(id){
-  database.ref("entries/" + id).remove();
-}
-
-// 💰 REFUND
-function submitRefund(){
-
-  let entryId = document.getElementById("refundEntry").value;
-  let item = document.getElementById("refundItem").value;
-  let qty = parseInt(document.getElementById("refundQty").value);
-
-  if(!entryId || !item || !qty){
-    alert("Fill all refund details");
-    return;
-  }
-
-  let amount = qty * prices[item];
-
-  database.ref("refunds").push({
-    entryId: entryId,
-    item: item,
-    qty: qty,
-    amount: amount,
-    timestamp: Date.now()
   });
 
-  alert("Refund Saved");
 }
-
-</script>
-
-</body>
-</html>
