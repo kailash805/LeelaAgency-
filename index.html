@@ -1,20 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Secure 5 Item Entry + Refund System</title>
+  <title>Secure Entry + Refund System</title>
 
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
   <style>
     body { font-family: Arial; margin:20px; }
-    input, select { padding:10px; margin:5px 0; display:block; font-size:16px; width:250px; }
-    button { padding:10px 20px; margin:5px 0; cursor:pointer; font-size:16px; }
+    input, select { padding:12px; margin:6px 0; display:block; font-size:16px; width:280px; }
+    button { padding:10px 20px; margin:6px 0; cursor:pointer; font-size:16px; }
     table { border-collapse: collapse; margin-top:10px; width:100%; max-width:500px; }
     th, td { padding:8px; border:1px solid #ccc; text-align:left; }
-    .pending { background:#fff3cd; padding:10px; margin:5px 0; }
-    .confirmed { background:#d4edda; padding:10px; margin:5px 0; }
-    .refundBox { padding:10px; margin:5px 0; }
+    .pending { background:#fff3cd; padding:10px; margin:6px 0; }
+    .confirmed { background:#d4edda; padding:10px; margin:6px 0; }
+    .refundBox { padding:10px; margin:6px 0; border:1px solid #ccc; }
     .settingsBox { background:#e2e3e5; padding:10px; margin:10px 0; }
   </style>
 </head>
@@ -38,16 +38,17 @@
     <button onclick="deleteAllRefunds()">Delete All Refunds</button>
   </div>
 
+  <!-- ENTRY SECTION -->
   <div id="entrySection">
-    <h2>5 Fixed Items Entry (Only C)</h2>
+    <h2>Item Entry (Only C)</h2>
     <table id="itemTable">
       <tr><th>Item</th><th>Price</th><th>Qty</th></tr>
     </table>
-    <button onclick="submitData()">Submit</button>
+    <button onclick="submitData()">Submit Entry</button>
   </div>
 
   <hr>
-  <h3>Grand Total: ₹<span id="grandTotal">0</span></h3>
+  <h3>Grand Total (Confirmed Only): ₹<span id="grandTotal">0</span></h3>
 
   <hr>
   <h2 id="refundTitle" style="display:none;">Refund Panel (Only C)</h2>
@@ -69,20 +70,29 @@
 </div>
 
 <script>
+
+// 🔥 PASTE YOUR ORIGINAL FIREBASE CONFIG HERE
 var firebaseConfig = {
-  apiKey: "YOUR KEY",
-  authDomain: "YOUR DOMAIN",
-  databaseURL: "YOUR DB URL",
-};
+  apiKey: "AIzaSyDeWeYu7mOaPcrDnqnTFZudck8tRU1az-M",
+    authDomain: "myapp-a3d28.firebaseapp.com",
+databaseURL: "https://myapp-a3d28-default-rtdb.asia-southeast1.firebasedatabase.app/
+    projectId: "myapp-a3d28",
+    storageBucket: "myapp-a3d28.firebasestorage.app",
+    messagingSenderId: "528024303624",
+    appId: "1:528024303624:web:0c5e552d636fd2c93e39bd"
+  };
+  
 firebase.initializeApp(firebaseConfig);
 var database = firebase.database();
 
+// USERS
 var users = {
   "9111111111": { role: "A", password: "1234" },
   "9222222222": { role: "B", password: "1234" },
   "9988770000": { role: "C", password: "1234" }
 };
 
+// ITEM PRICES
 var prices = {
   "200 G":20,
   "600 G":51,
@@ -93,7 +103,7 @@ var prices = {
 
 let currentUser = "";
 
-// Generate Table
+// Generate Item Table
 let table = document.getElementById("itemTable");
 for(let item in prices){
   table.innerHTML += `
@@ -105,23 +115,29 @@ for(let item in prices){
   `;
 }
 
+// LOGIN
 function login(){
-  let mobile = mobile.value.trim();
-  let pass = password.value.trim();
+  let mobileInput = document.getElementById("mobile").value.trim();
+  let passInput   = document.getElementById("password").value.trim();
 
-  if(users[mobile] && users[mobile].password === pass){
-    currentUser = users[mobile].role;
-    loginSection.style.display="none";
-    app.style.display="block";
-    userRole.innerText=currentUser;
+  if(users[mobileInput] && users[mobileInput].password === passInput){
 
-    if(currentUser !== "C") entrySection.style.display="none";
+    currentUser = users[mobileInput].role;
+
+    document.getElementById("loginSection").style.display="none";
+    document.getElementById("app").style.display="block";
+    document.getElementById("userRole").innerText=currentUser;
+
+    if(currentUser !== "C"){
+      document.getElementById("entrySection").style.display="none";
+    }
 
     if(currentUser === "C"){
-      refundSection.style.display="block";
-      refundTitle.style.display="block";
-      settingsBtn.style.display="inline-block";
+      document.getElementById("refundSection").style.display="block";
+      document.getElementById("refundTitle").style.display="block";
+      document.getElementById("settingsBtn").style.display="inline-block";
 
+      let refundItem = document.getElementById("refundItem");
       refundItem.innerHTML="";
       for(let item in prices){
         refundItem.innerHTML += `<option value="${item}">${item}</option>`;
@@ -130,19 +146,27 @@ function login(){
 
     loadEntries();
     loadRefundHistory();
-  } else alert("Invalid Login");
+
+  } else {
+    alert("Invalid Mobile or Password");
+  }
 }
 
 function logout(){ location.reload(); }
 
+// SUBMIT ENTRY
 function submitData(){
+  if(currentUser !== "C") return;
+
   let entryData={}, total=0;
+
   for(let item in prices){
     let qty=parseInt(document.getElementById(item).value)||0;
     entryData[item]=qty;
     total+=qty*prices[item];
   }
-  if(total===0) return alert("Enter qty");
+
+  if(total===0) return alert("Enter quantity");
 
   database.ref("entries").push({
     items:entryData,
@@ -152,10 +176,12 @@ function submitData(){
   });
 }
 
+// LOAD ENTRIES
 function loadEntries(){
   database.ref("entries").on("value", snap=>{
     let data=snap.val()||{}, html="", total=0;
-    refundEntry.innerHTML="";
+    let refundDropdown=document.getElementById("refundEntry");
+    refundDropdown.innerHTML="";
 
     for(let id in data){
       let e=data[id];
@@ -165,26 +191,30 @@ function loadEntries(){
       <b>Date:</b> ${d.toLocaleString()}<br>`;
 
       for(let item in e.items){
-        if(e.items[item]>0) html+=`${item}: ${e.items[item]}<br>`;
+        if(e.items[item]>0)
+          html+=`${item}: ${e.items[item]}<br>`;
       }
 
       html+=`<b>Total:</b> ₹${e.total}<br>
              <b>Status:</b> ${e.status}`;
 
-      if((currentUser==="A"||currentUser==="B")&&e.status==="pending")
+      if((currentUser==="A"||currentUser==="B")&&e.status==="pending"){
         html+=`<br><button onclick="confirmEntry('${id}')">Confirm</button>`;
+      }
 
       if(e.status==="confirmed"){
         total+=e.total;
-        if(currentUser==="C")
-          refundEntry.innerHTML+=`<option value="${id}">
-          ${d.toLocaleDateString()} - ₹${e.total}</option>`;
+        if(currentUser==="C"){
+          refundDropdown.innerHTML+=
+            `<option value="${id}">${d.toLocaleDateString()} - ₹${e.total}</option>`;
+        }
       }
 
       html+=`</div>`;
     }
-    entries.innerHTML=html;
-    grandTotal.innerText=total;
+
+    document.getElementById("entries").innerHTML=html;
+    document.getElementById("grandTotal").innerText=total;
   });
 }
 
@@ -192,9 +222,10 @@ function confirmEntry(id){
   database.ref("entries/"+id).update({status:"confirmed"});
 }
 
-// ===== REFUND SYSTEM WITH CONFIRM =====
-
+// REFUND SYSTEM
 function submitRefund(){
+  if(currentUser!=="C") return;
+
   let entryId=refundEntry.value;
   let item=refundItem.value;
   let qty=parseInt(refundQty.value);
@@ -212,6 +243,7 @@ function submitRefund(){
 function loadRefundHistory(){
   database.ref("refunds").on("value",snap=>{
     let data=snap.val()||{}, html="";
+
     for(let id in data){
       let r=data[id];
       let d=new Date(r.timestamp);
@@ -223,13 +255,15 @@ function loadRefundHistory(){
       Amount: ₹${r.amount}<br>
       Status: ${r.status}`;
 
-      if((currentUser==="A"||currentUser==="B")&&r.status==="pending")
-        html+=`<br><button onclick="confirmRefund('${id}')">
-        Confirm Refund</button>`;
+      if((currentUser==="A"||currentUser==="B")&&r.status==="pending"){
+        html+=`<br><button onclick="confirmRefund('${id}')">Confirm Refund</button>`;
+      }
 
       html+=`</div>`;
     }
-    refundHistory.innerHTML=html||"No refund yet.";
+
+    document.getElementById("refundHistory").innerHTML=
+      html||"No refund yet.";
   });
 }
 
@@ -237,11 +271,10 @@ function confirmRefund(id){
   database.ref("refunds/"+id).update({status:"confirmed"});
 }
 
-// ===== SETTINGS =====
-
+// SETTINGS
 function toggleSettings(){
-  settingsPanel.style.display=
-  settingsPanel.style.display==="none"?"block":"none";
+  let panel=document.getElementById("settingsPanel");
+  panel.style.display=panel.style.display==="none"?"block":"none";
 }
 
 function deleteAllEntries(){
