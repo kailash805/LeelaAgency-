@@ -8,7 +8,7 @@
 
   <style>
     body { font-family: Arial; margin:20px; }
-    input, select { padding:5px; margin:5px; }
+    input, select { padding:5px; margin:5px; display:block; }
     table { border-collapse: collapse; margin-top:10px; }
     th, td { padding:8px; border:1px solid #ccc; }
     button { padding:5px 10px; margin:5px; cursor:pointer; }
@@ -19,47 +19,52 @@
 </head>
 <body>
 
-<h2>Login</h2>
-<input type="text" id="mobile" placeholder="Mobile Number">
-<input type="password" id="password" placeholder="Password">
-<button onclick="login()">Login</button>
-
-<div id="app" style="display:none;">
-
-<h3>Welcome: <span id="userRole"></span></h3>
-
-<h2>5 Fixed Items Entry (Only C)</h2>
-
-<table id="itemTable">
-<tr>
-  <th>Item</th>
-  <th>Price</th>
-  <th>Qty</th>
-</tr>
-</table>
-
-<button id="submitBtn" onclick="submitData()">Submit</button>
-
-<hr>
-<h3>Grand Total: ₹<span id="grandTotal">0</span></h3>
-
-<hr>
-<h2 id="refundTitle" style="display:none;">Refund Panel (Only C)</h2>
-
-<div id="refundSection" style="display:none;">
-  <select id="refundEntry"></select>
-  <select id="refundItem"></select>
-  <input type="number" id="refundQty" placeholder="Refund Qty">
-  <button onclick="submitRefund()">Submit Refund</button>
+<!-- ✅ LOGIN SECTION -->
+<div id="loginSection">
+  <h2>Login</h2>
+  <input type="text" id="mobile" placeholder="Mobile Number">
+  <input type="password" id="password" placeholder="Password">
+  <button onclick="login()">Login</button>
 </div>
 
-<hr>
-<h2>All Entries</h2>
-<div id="entries"></div>
+<!-- ✅ APP SECTION -->
+<div id="app" style="display:none;">
 
-<hr>
-<h2>Refund History</h2>
-<div id="refundHistory"></div>
+  <h3>Welcome: <span id="userRole"></span></h3>
+  <button onclick="logout()" style="margin-bottom:10px;">Logout</button>
+
+  <h2>5 Fixed Items Entry (Only C)</h2>
+
+  <table id="itemTable">
+    <tr>
+      <th>Item</th>
+      <th>Price</th>
+      <th>Qty</th>
+    </tr>
+  </table>
+
+  <button id="submitBtn" onclick="submitData()">Submit</button>
+
+  <hr>
+  <h3>Grand Total: ₹<span id="grandTotal">0</span></h3>
+
+  <hr>
+  <h2 id="refundTitle" style="display:none;">Refund Panel (Only C)</h2>
+
+  <div id="refundSection" style="display:none;">
+    <select id="refundEntry"></select>
+    <select id="refundItem"></select>
+    <input type="number" id="refundQty" placeholder="Refund Qty">
+    <button onclick="submitRefund()">Submit Refund</button>
+  </div>
+
+  <hr>
+  <h2>All Entries</h2>
+  <div id="entries"></div>
+
+  <hr>
+  <h2>Refund History</h2>
+  <div id="refundHistory"></div>
 
 </div>
 
@@ -95,7 +100,7 @@ var prices = {
 
 let currentUser = "";
 
-// Generate Item Table
+// ✅ Generate Item Table
 let table = document.getElementById("itemTable");
 for(let item in prices){
   table.innerHTML += `
@@ -107,13 +112,16 @@ for(let item in prices){
   `;
 }
 
-// 🔐 LOGIN
+// 🔐 LOGIN FUNCTION
 function login(){
   let mobile = document.getElementById("mobile").value.trim();
   let password = document.getElementById("password").value.trim();
 
   if(users[mobile] && users[mobile].password === password){
     currentUser = users[mobile].role;
+
+    // ✅ Hide login, show app
+    document.getElementById("loginSection").style.display = "none";
     document.getElementById("app").style.display = "block";
     document.getElementById("userRole").innerText = currentUser;
 
@@ -130,13 +138,22 @@ function login(){
     }
 
     alert("Login Successful");
-
-    // ✅ Load entries after login
     loadEntries();
 
   } else {
     alert("Invalid Mobile or Password");
   }
+}
+
+// 🔐 LOGOUT FUNCTION
+function logout(){
+  currentUser = "";
+  document.getElementById("app").style.display = "none";
+  document.getElementById("loginSection").style.display = "block";
+
+  // Clear login fields
+  document.getElementById("mobile").value = "";
+  document.getElementById("password").value = "";
 }
 
 // 📝 C SUBMIT ENTRY
@@ -189,7 +206,7 @@ function loadEntries(){
       html += `<div class="${entry.status}">
         <b>Date:</b> ${entryDate.toLocaleString()}<br>`;
 
-      // ✅ SHOW ITEMS
+      // ✅ Show items
       if(entry.items){
         for(let item in entry.items){
           if(entry.items[item] > 0){
@@ -201,21 +218,21 @@ function loadEntries(){
       html += `<b>Total:</b> ₹${entry.total}<br>
                <b>Status:</b> ${entry.status}`;
 
-      // ✅ CONFIRM BUTTON FOR A/B
+      // ✅ Confirm button for A/B
       if((currentUser === "A" || currentUser === "B") && entry.status === "pending"){
         html += `<br><button onclick="confirmEntry('${id}')">Confirm</button>`;
       }
 
-      // ✅ DELETE BUTTON FOR C
+      // ✅ Delete button for C
       if(currentUser === "C" && entry.status === "pending"){
         html += `<button onclick="deleteEntry('${id}')">Delete</button>`;
       }
 
-      // ✅ REFUND DROPDOWN
+      // ✅ Refund dropdown for C
       if(entry.status === "confirmed" && currentUser === "C"){
         refundEntryDropdown.innerHTML += 
           `<option value="${id}">${entryDate.toLocaleDateString()} - ₹${entry.total}</option>`;
-        totalConfirmed += entry.total; // update grand total
+        totalConfirmed += entry.total;
       }
 
       html += `</div>`;
@@ -226,7 +243,7 @@ function loadEntries(){
   });
 }
 
-// ✅ CONFIRM ENTRY
+// ✅ Confirm Entry
 function confirmEntry(id){
   database.ref("entries/" + id).update({
     status: "confirmed",
@@ -234,7 +251,7 @@ function confirmEntry(id){
   });
 }
 
-// ❌ DELETE ENTRY
+// ❌ Delete Entry
 function deleteEntry(id){
   database.ref("entries/" + id).remove();
 }
