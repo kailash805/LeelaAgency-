@@ -21,7 +21,7 @@
 <body>
 
 <h2>Login</h2>
-<input type="text" id="mobile" placeholder="Mobile">
+<input type="text" id="mobile" placeholder="Mobile Number">
 <input type="password" id="password" placeholder="Password">
 <button onclick="login()">Login</button>
 
@@ -43,7 +43,6 @@
 
 <hr>
 <h3>Grand Total: ₹<span id="grandTotal">0</span></h3>
-<h3>Weekly Total: ₹<span id="weeklyTotal">0</span></h3>
 
 <hr>
 <h2 id="refundTitle" style="display:none;">Refund Panel (Only C)</h2>
@@ -67,18 +66,21 @@
 
 <script>
 
-// 🔥 Firebase Config
+// 🔥 Your Firebase Config (Already Added)
 var firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  databaseURL: "YOUR_DATABASE_URL",
-  projectId: "YOUR_PROJECT_ID"
+  apiKey: "AIzaSyDeWeYu7mOaPcrDnqnTFZudck8tRU1az-M",
+  authDomain: "myapp-a3d28.firebaseapp.com",
+  databaseURL: "https://myapp-a3d28-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "myapp-a3d28",
+  storageBucket: "myapp-a3d28.firebasestorage.app",
+  messagingSenderId: "528024303624",
+  appId: "1:528024303624:web:0c5e552d636fd2c93e39bd"
 };
 
 firebase.initializeApp(firebaseConfig);
 var database = firebase.database();
 
-// 🔐 Users
+// 🔐 Fixed Users
 var users = {
   "9111111111": { role: "A", password: "1234" },
   "9222222222": { role: "B", password: "1234" },
@@ -96,7 +98,7 @@ var prices = {
 
 let currentUser = "";
 
-// Generate Table
+// Generate Item Table
 let table = document.getElementById("itemTable");
 for(let item in prices){
   table.innerHTML += `
@@ -108,14 +110,16 @@ for(let item in prices){
   `;
 }
 
-// LOGIN
+// 🔐 LOGIN
 function login(){
-  let mobile = document.getElementById("mobile").value;
-  let password = document.getElementById("password").value;
+
+  let mobile = document.getElementById("mobile").value.trim();
+  let password = document.getElementById("password").value.trim();
 
   if(users[mobile] && users[mobile].password === password){
 
     currentUser = users[mobile].role;
+
     document.getElementById("app").style.display = "block";
     document.getElementById("userRole").innerText = currentUser;
 
@@ -127,7 +131,7 @@ function login(){
       document.getElementById("refundSection").style.display = "block";
       document.getElementById("refundTitle").style.display = "block";
 
-      // Refund Item Dropdown
+      // Refund item dropdown
       let refundItem = document.getElementById("refundItem");
       refundItem.innerHTML = "";
       for(let item in prices){
@@ -135,12 +139,14 @@ function login(){
       }
     }
 
+    alert("Login Successful");
+
   } else {
-    alert("Invalid Login");
+    alert("Invalid Mobile or Password");
   }
 }
 
-// SUBMIT ENTRY
+// 📝 SUBMIT ENTRY
 function submitData(){
 
   if(currentUser !== "C"){
@@ -175,7 +181,7 @@ function submitData(){
   }
 }
 
-// ENTRY LIST
+// 📊 LOAD ENTRIES
 database.ref("entries").on("value", function(snapshot){
 
   let data = snapshot.val() || {};
@@ -219,7 +225,7 @@ database.ref("entries").on("value", function(snapshot){
   document.getElementById("grandTotal").innerText = totalConfirmed;
 });
 
-// CONFIRM
+// ✅ CONFIRM
 function confirmEntry(id){
   database.ref("entries/" + id).update({
     status: "confirmed",
@@ -227,12 +233,12 @@ function confirmEntry(id){
   });
 }
 
-// DELETE
+// ❌ DELETE
 function deleteEntry(id){
   database.ref("entries/" + id).remove();
 }
 
-// REFUND
+// 💰 REFUND
 function submitRefund(){
 
   let entryId = document.getElementById("refundEntry").value;
