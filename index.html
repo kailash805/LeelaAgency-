@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Secure 5 Item Entry + Refund System</title>
+
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+  <style>
+    body { font-family: Arial; margin:20px; }
+    input, select { padding:5px; margin:5px; }
+    table { border-collapse: collapse; margin-top:10px; }
+    th, td { padding:8px; border:1px solid #ccc; }
+    button { padding:5px 10px; margin:5px; cursor:pointer; }
+    .pending { background:#fff3cd; padding:10px; margin:5px; }
+    .confirmed { background:#d4edda; padding:10px; margin:5px; }
+    .refundBox { background:#f8d7da; padding:10px; margin:5px; }
+  </style>
+</head>
+<body>
+
+<h2>Login</h2>
+<input type="text" id="mobile" placeholder="Mobile">
+<input type="password" id="password" placeholder="Password">
+<button onclick="login()">Login</button>
+
+<div id="app" style="display:none;">
+
+<h3>Welcome: <span id="userRole"></span></h3>
+
+<h2>5 Fixed Items Entry (Only C)</h2>
+
+<table id="itemTable">
+<tr>
+  <th>Item</th>
+  <th>Price</th>
+  <th>Qty</th>
+</tr>
+</table>
+
+<button id="submitBtn" onclick="submitData()">Submit</button>
+
+<hr>
+<h3>Grand Total (Confirmed - Refund): ₹<span id="grandTotal">0</span></h3>
+<h3>Weekly Total: ₹<span id="weeklyTotal">0</span></h3>
+
+<hr>
+<h2 id="refundTitle" style="display:none;">Refund Panel (Only C)</h2>
+
+<div id="refundSection" style="display:none;">
+  <select id="refundEntry"></select>
+  <select id="refundItem"></select>
+  <input type="number" id="refundQty" placeholder="Refund Qty">
+  <button onclick="submitRefund()">Submit Refund</button>
+</div>
+
+<hr>
+<h2>All Entries</h2>
+<div id="entries"></div>
+
+<hr>
+<h2>Refund History</h2>
+<div id="refundHistory"></div>
+
+</div>
+
+<script>
+
+// 🔥 Firebase Config
+var firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  databaseURL: "YOUR_DATABASE_URL",
+  projectId: "YOUR_PROJECT_ID",
+};
+
+firebase.initializeApp(firebaseConfig);
+var database = firebase.database();
+
+// 🔐 Fixed Users
+var users = {
+  "9111111111": { role: "A", password: "1234" },
+  "9222222222": { role: "B", password: "1234" },
+  "9988770000": { role: "C", password: "1234" }
+};
+
+var prices = {
+  "200 G":20,
+  "600 G":52,
+  "Pizza":40,
+  "Bhajipav":45,
+  "Braun 400 G":50
+};
+
+let currentUser = "";
+
+// Generate Item Table
+let table = document.getElementById("itemTable");
+for(let item in prices){
+  table.innerHTML += `
+    <tr>
+      <td>${item}</td>
+      <td>₹${prices[item]}</td>
+      <td><input type="number" id="${item}" min="0"></td>
+    </tr>
+  `;
+}
+
+// 🔐 LOGIN
+function login(){
+  let mobile = document.getElementById("mobile").value;
+  let password = document.getElementById("password").value;
+
+  if(users[mobile] && users[mobile].password === password){
+    currentUser = users[mobile].role;
+    document.getElementById("app").style.display = "block";
+    document.getElementById("userRole").innerText = currentUser;
+
+    if(currentUser !== "C"){
+      document.getElementById("submitBtn").style.display = "none";
+    }
+
+    if(currentUser === "C"){
+      document.getElementById("refundSection").style.display = "block";
+      document.getElementById("refundTitle").style.display = "block";
+    }
+
+  } else {
+    alert("Invalid Login");
+  }
+}
+
+// 📝 SUBMIT ENTRY (C ONLY)
+function submitData(){
+
+  if(currentUser !== "C"){
+    alert("Only C can submit");
+    return;
+  }
+
+  let entryData = {};
+  let total = 0;
+
+  for(let item in prices){
+    let qty = parseInt(document.getElementById(item).value) || 0;
+    entryData[item] = qty;
+    total += qty * prices[item];
+  }
+
+  if(total == 0){
+    alert("Enter quantity first");
+    return;
+  }
+
+  database.ref("entries").push({
+    items: entryData,
+    total: total,
+    createdBy: "C",
+    timestamp: Date.now(),
+    status: "pending",
+    confirmedBy: ""
+  });
+
+  for(let item in prices){
+    document.getElementById(item).value = "";
+  }
+}
+
+// 📊 ENTRY LIST + TOTAL CALCULATION
+database.ref("entries").on("value", function(snapshot){
+
+  let data = snapshot.val();
+  let html = "";
+  let grandTotal = 0;
+  let weeklyTotal = 0;
+
+  let now = new Date();
+  let firstDayOfWeek = new Date();
+  firstDayOfWeek.setDate(now.getDate() - now.getDay());
+  firstDayOfWeek.setHours(0,0,0,0);
+
+  let refundEntryDropdown = document.getElementById("refundEntry");
+  if(refundEntryDropdown) refundEntryDropdown.innerHTML = "";
+
+  for(let id in data){
+
+    let entry = data[id];
+    let entryDate = new Date(entry.timestamp);
+    let className = entry.status === "pending" ? "pending" : "confirmed";
+
+    html += `<div class="${className}">
+      <b>Date:</b> ${entryDate.toLocaleDateString()} ${entryDate.toLocaleTimeString()}<br>`;
+
+    for(let item in entry.items){
+      if(entry.items[item] > 0){
+        html += `${item}: ${entry.items[item]}<br>`;
+      }
+    }
+
+    html += `<b>Total:</b> ₹${entry.total}<br>
+             <b>Status:</b> ${entry.status}`;
+
+    if(entry.status === "confirmed"){
+      html += ` by ${entry.confirmedBy}`;
+      grandTotal += entry.total;
+
+      if(entryDate >= firstDayOfWeek){
+        weeklyTotal += entry.total;
+      }
+
+      if(currentUser === "C"){
+        refundEntryDropdown.innerHTML += 
+          `<option value="${id}">${entryDate.toLocaleDateString()} - ₹${entry.total}</option>`;
+      }
+    }
+
+    if((currentUser === "A" || currentUser === "B") 
+        && entry.status === "pending"){
+      html += `<br><button onclick="confirmEntry('${id}')">Confirm</button>`;
+    }
+
+    if(currentUser === "C" && entry.status === "pending"){
+      html += `<button onclick="deleteEntry('${id}')">Delete</button>`;
+    }
+
+    html += `</div>`;
+  }
+
+  calculateFinalTotal(grandTotal, weeklyTotal);
+  document.getElementById("entries").innerHTML = html;
+
+});
+
+// 💰 REFUND SUBMIT
+function submitRefund(){
+
+  let entryId = document.getElementById("refundEntry").value;
+  let item = document.getElementById("refundItem").value;
+  let qty = parseInt(document.getElementById("refundQty").value);
+
+  if(!entryId || !item || !qty){
+    alert("Fill all refund details");
+    return;
+  }
+
+  let refundAmount = qty * prices[item];
+
+  database.ref("refunds").push({
+    entryId: entryId,
+    item: item,
+    qty: qty,
+    amount: refundAmount,
+    refundedBy: "C",
+    timestamp: Date.now()
+  });
+
+  alert("Refund Saved");
+}
+
+// 🔁 REFUND HISTORY + TOTAL ADJUST
+database.ref("refunds").on("value", function(snapshot){
+
+  let refunds = snapshot.val();
+  let html = "";
+  let refundTotal = 0;
+  let weeklyRefund = 0;
+
+  let now = new Date();
+  let firstDayOfWeek = new Date();
+  firstDayOfWeek.setDate(now.getDate() - now.getDay());
+  firstDayOfWeek.setHours(0,0,0,0);
+
+  for(let id in refunds){
+
+    let r = refunds[id];
+    let rDate = new Date(r.timestamp);
+
+    refundTotal += r.amount;
+
+    if(rDate >= firstDayOfWeek){
+      weeklyRefund += r.amount;
+    }
+
+    html += `
+      <div class="refundBox">
+        <b>Date:</b> ${rDate.toLocaleDateString()} ${rDate.toLocaleTimeString()}<br>
+        <b>Item:</b> ${r.item}<br>
+        <b>Qty:</b> ${r.qty}<br>
+        <b>Amount:</b> ₹${r.amount}
+      </div>
+    `;
+  }
+
+  document.getElementById("refundHistory").innerHTML = html;
+
+});
+
+// 🔢 FINAL TOTAL CALCULATION
+function calculateFinalTotal(entryTotal, weeklyEntryTotal){
+
+  database.ref("refunds").once("value", function(refSnap){
+
+    let refunds = refSnap.val() || {};
+    let refundTotal = 0;
+    let weeklyRefund = 0;
+
+    let now = new Date();
+    let firstDayOfWeek = new Date();
+    firstDayOfWeek.setDate(now.getDate() - now.getDay());
+    firstDayOfWeek.setHours(0,0,0,0);
+
+    for(let id in refunds){
+      let r = refunds[id];
+      let rDate = new Date(r.timestamp);
+
+      refundTotal += r.amount;
+
+      if(rDate >= firstDayOfWeek){
+        weeklyRefund += r.amount;
+      }
+    }
+
+    document.getElementById("grandTotal").innerText = entryTotal - refundTotal;
+    document.getElementById("weeklyTotal").innerText = weeklyEntryTotal - weeklyRefund;
+
+  });
+}
+
+// CONFIRM
+function confirmEntry(id){
+  database.ref("entries/" + id).update({
+    status: "confirmed",
+    confirmedBy: currentUser
+  });
+}
+
+// DELETE
+function deleteEntry(id){
+  database.ref("entries/" + id).remove();
+}
+
+</script>
+
+</body>
+  </html>
